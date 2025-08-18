@@ -97,6 +97,15 @@ impl RoomUpdates {
             .chain(self.invited.keys())
             .chain(self.knocked.keys())
     }
+
+    /// Returns whether or not this update contains any changes to the list
+    /// of invited, joined, knocked or left rooms.
+    pub fn is_empty(&self) -> bool {
+        self.invited.is_empty()
+            && self.joined.is_empty()
+            && self.knocked.is_empty()
+            && self.left.is_empty()
+    }
 }
 
 #[cfg(test)]
