@@ -76,13 +76,13 @@ pub enum SpaceRoomListPaginationState {
 /// // spawn {
 /// while let Some(pagination_state) = pagination_state_stream.next().await {
 ///     println!("Received pagination state update: {pagination_state:?}");
-/// };
+/// }
 /// // }
 ///
 /// // spawn {
 /// while let Some(diffs) = room_stream.next().await {
 ///     println!("Received room list update: {diffs:?}");
-/// };
+/// }
 /// // }
 ///
 /// // Ask the room to load the next page
