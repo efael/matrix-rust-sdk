@@ -322,7 +322,7 @@ impl WidgetSettings {
             sentry_environment: props.sentry_environment,
             rageshake_submit_url: props.rageshake_submit_url,
             hide_screensharing: config.hide_screensharing,
-            controlled_media_devices: config.controlled_media_devices,
+            controlled_audio_devices: config.controlled_audio_devices,
             send_notification_type: config.send_notification_type,
         };
 
@@ -350,13 +350,13 @@ mod tests {
     use url::Url;
 
     use crate::widget::{
-        settings::element_call::VirtualElementCallWidgetConfig, ClientProperties, Intent,
-        WidgetSettings,
+        settings::element_call::{HeaderStyle, VirtualElementCallWidgetConfig},
+        ClientProperties, Intent, WidgetSettings,
     };
 
     const WIDGET_ID: &str = "1/@#w23";
 
-    fn get_widget_settings(
+    fn get_element_call_widget_settings(
         encryption: Option<EncryptionSystem>,
         posthog: bool,
         rageshake: bool,
@@ -378,7 +378,12 @@ mod tests {
         };
 
         let config = VirtualElementCallWidgetConfig {
-            controlled_media_devices: Some(controlled_output),
+            controlled_audio_devices: Some(controlled_output),
+            preload: Some(true),
+            app_prompt: Some(true),
+            confine_to_room: Some(true),
+            hide_screensharing: Some(false),
+            header: Some(HeaderStyle::Standard),
             intent,
             ..VirtualElementCallWidgetConfig::default()
         };
@@ -413,7 +418,8 @@ mod tests {
 
     #[test]
     fn test_new_virtual_element_call_widget_base_url() {
-        let widget_settings = get_widget_settings(None, false, false, false, None, false);
+        let widget_settings =
+            get_element_call_widget_settings(None, false, false, false, None, false);
         assert_eq!(widget_settings.base_url().unwrap().as_str(), "https://call.element.io/");
     }
 
@@ -437,10 +443,12 @@ mod tests {
                 &preload=true\
                 &perParticipantE2EE=true\
                 &hideScreensharing=false\
-                &controlledMediaDevices=false\
+                &controlledAudioDevices=false\
         ";
 
-        let mut url = get_widget_settings(None, false, false, false, None, false).raw_url().clone();
+        let mut url = get_element_call_widget_settings(None, false, false, false, None, false)
+            .raw_url()
+            .clone();
         let mut gen = Url::parse(CONVERTED_URL).unwrap();
         assert_eq!(get_query_sets(&url).unwrap(), get_query_sets(&gen).unwrap());
         url.set_fragment(None);
@@ -453,7 +461,7 @@ mod tests {
     #[test]
     fn test_new_virtual_element_call_widget_id() {
         assert_eq!(
-            get_widget_settings(None, false, false, false, None, false).widget_id(),
+            get_element_call_widget_settings(None, false, false, false, None, false).widget_id(),
             WIDGET_ID
         );
     }
@@ -494,9 +502,9 @@ mod tests {
                 &clientId=io.my_matrix.client\
                 &perParticipantE2EE=true\
                 &hideScreensharing=false\
-                &controlledMediaDevices=false\
+                &controlledAudioDevices=false\
         ";
-        let gen = build_url_from_widget_settings(get_widget_settings(
+        let gen = build_url_from_widget_settings(get_element_call_widget_settings(
             None, false, false, false, None, false,
         ));
 
@@ -535,9 +543,9 @@ mod tests {
                 &rageshakeSubmitUrl=https%3A%2F%2Frageshake.element.io\
                 &sentryDsn=SENTRY_DSN\
                 &sentryEnvironment=SENTRY_ENV\
-                &controlledMediaDevices=false\
+                &controlledAudioDevices=false\
         ";
-        let gen = build_url_from_widget_settings(get_widget_settings(
+        let gen = build_url_from_widget_settings(get_element_call_widget_settings(
             None, true, true, true, None, false,
         ));
 
@@ -555,7 +563,7 @@ mod tests {
     fn test_password_url_props_from_widget_settings() {
         {
             // PerParticipantKeys
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 Some(EncryptionSystem::PerParticipantKeys),
                 false,
                 false,
@@ -574,7 +582,7 @@ mod tests {
         }
         {
             // Unencrypted
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 Some(EncryptionSystem::Unencrypted),
                 false,
                 false,
@@ -591,7 +599,7 @@ mod tests {
         }
         {
             // SharedSecret
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 Some(EncryptionSystem::SharedSecret { secret: "this_surely_is_save".to_owned() }),
                 false,
                 false,
@@ -614,7 +622,7 @@ mod tests {
     fn test_controlled_output_url_props_from_widget_settings() {
         {
             // PerParticipantKeys
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 Some(EncryptionSystem::PerParticipantKeys),
                 false,
                 false,
@@ -622,11 +630,11 @@ mod tests {
                 None,
                 true,
             ));
-            let controlled_media_element = ("controlledMediaDevices".to_owned(), "true".to_owned());
+            let controlled_audio_element = ("controlledAudioDevices".to_owned(), "true".to_owned());
             let query_set = get_query_sets(&Url::parse(&url).unwrap()).unwrap().1;
             assert!(
-                query_set.contains(&controlled_media_element),
-                "The query elements: \n{query_set:?}\nDid not contain: \n{controlled_media_element:?}"
+                query_set.contains(&controlled_audio_element),
+                "The query elements: \n{query_set:?}\nDid not contain: \n{controlled_audio_element:?}"
             );
         }
     }
@@ -635,7 +643,7 @@ mod tests {
     fn test_intent_url_props_from_widget_settings() {
         {
             // no intent
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 None, false, false, false, None, false,
             ));
             let query_set = get_query_sets(&Url::parse(&url).unwrap()).unwrap().1;
@@ -651,7 +659,7 @@ mod tests {
         }
         {
             // Intent::JoinExisting
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 None,
                 false,
                 false,
@@ -677,7 +685,7 @@ mod tests {
         }
         {
             // Intent::StartCall
-            let url = build_url_from_widget_settings(get_widget_settings(
+            let url = build_url_from_widget_settings(get_element_call_widget_settings(
                 None,
                 false,
                 false,
@@ -687,11 +695,7 @@ mod tests {
             ));
             let query_set = get_query_sets(&Url::parse(&url).unwrap()).unwrap().1;
 
-            // skipLobby should be set for compatibility with versions < 0.8.0
-            let expected_elements = [
-                ("intent".to_owned(), "start_call".to_owned()),
-                ("skipLobby".to_owned(), "true".to_owned()),
-            ];
+            let expected_elements = [("intent".to_owned(), "start_call".to_owned())];
             for e in expected_elements {
                 assert!(
                     query_set.contains(&e),
