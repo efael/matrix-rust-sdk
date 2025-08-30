@@ -2314,6 +2314,48 @@ impl Client {
         Ok(SyncResponse::new(next_batch, response))
     }
 
+    #[instrument(skip(self))]
+    pub async fn sync_once_with_origin_response(
+        &self,
+        sync_settings: crate::config::SyncSettings,
+    ) -> Result<(SyncResponse, sync_events::v3::Response)> {
+        // The sync might not return for quite a while due to the timeout.
+        // We'll see if there's anything crypto related to send out before we
+        // sync, i.e. if we closed our client after a sync but before the
+        // crypto requests were sent out.
+        //
+        // This will mostly be a no-op.
+        #[cfg(feature = "e2e-encryption")]
+        if let Err(e) = self.send_outgoing_requests().await {
+            error!(error = ?e, "Error while sending outgoing E2EE requests");
+        }
+
+        let request = assign!(sync_events::v3::Request::new(), {
+            filter: sync_settings.filter.map(|f| *f),
+            since: sync_settings.token,
+            full_state: sync_settings.full_state,
+            set_presence: sync_settings.set_presence,
+            timeout: sync_settings.timeout,
+        });
+        let mut request_config = self.request_config();
+        if let Some(timeout) = sync_settings.timeout {
+            request_config.timeout += timeout;
+        }
+
+        let origin_response = self.send(request).with_request_config(request_config).await?;
+        let next_batch = origin_response.next_batch.clone();
+        let response = self.process_sync(origin_response.clone()).await?;
+
+        #[cfg(feature = "e2e-encryption")]
+        if let Err(e) = self.send_outgoing_requests().await {
+            error!(error = ?e, "Error while sending outgoing E2EE requests");
+        }
+
+        self.inner.sync_beat.notify(usize::MAX);
+
+        Ok((SyncResponse::new(next_batch, response), origin_response))
+    }
+
     /// Repeatedly synchronize the client state with the server.
     ///
     /// This method will only return on error, if cancellation is needed
