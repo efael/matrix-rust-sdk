@@ -21,3 +21,5 @@ xcuserdata/
 bindings/kotlin/.gradle/
 bindings/kotlin/buildSrc/build/
 bindings/kotlin/buildSrc/.gradle/
+
+.direnv/
